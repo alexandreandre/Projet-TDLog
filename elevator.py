@@ -11,3 +11,9 @@ class Elevator:
         self.destination_floors = []  #Liste des étages que l'ascenseur doit atteindre.
         self.direction = 0  #Direction : -1 pour descendre, 1 pour monter, 0 pour inactif.
         self.is_moving = False  #Statut de l'ascenseur (en mouvement ou non).
+
+    def add_destination(self, floor):
+        if floor not in self.destination_floors:
+            self.destination_floors.append(floor)
+            self.destination_floors.sort(reverse=self.direction < 0)
+
