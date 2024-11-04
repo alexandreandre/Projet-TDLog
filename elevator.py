@@ -46,3 +46,9 @@ class Elevator:
     def __repr__(self):
         return f"Ascenseur {self.id} à l'étage {self.current_floor}"
 
+class ElevatorController:
+    def __init__(self, num_elevators, num_floors):
+        self.elevators = [Elevator(elevator_id=i) for i in range(num_elevators)]
+        self.num_floors = num_floors
+        self.users = []
+        self.user_id_counter = 0
