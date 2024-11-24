@@ -61,3 +61,42 @@ class ElevatorController:
         self.num_floors = num_floors
         self.users = []
         self.user_id_counter = 0
+
+    def request_elevator(self, user):
+        # Trouver le meilleur ascenseur pour l'utilisateur
+        best_elevator = min(
+            self.elevators, key=lambda e: abs(e.current_floor - user.current_floor)
+        )
+        best_elevator.add_destination(user.current_floor)
+        user.elevator_id = best_elevator.id
+
+    def update_users(self):
+        for user in self.users:
+            if not user.arrived:
+                elevator = self.elevators[user.elevator_id]
+                if user.in_elevator:
+                    if elevator.current_floor == user.destination_floor:
+                        # L'utilisateur est arrivé à destination
+                        user.arrived = True
+                        elevator.passengers.remove(user)
+                else:
+                    if (
+                        elevator.current_floor == user.current_floor
+                        and not user.in_elevator
+                    ):
+                        # L'utilisateur monte dans l'ascenseur
+                        user.in_elevator = True
+                        elevator.add_destination(user.destination_floor)
+                        elevator.passengers.append(user)
+
+    def step(self):
+        for elevator in self.elevators:
+            elevator.move()
+        self.update_users()
+
+    def add_user(self, current_floor, destination_floor):
+        user = User(self.user_id_counter, current_floor, destination_floor)
+        self.user_id_counter += 1
+        self.users.append(user)
+        self.request_elevator(user)
+        return user
