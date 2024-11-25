@@ -10,7 +10,7 @@ if __name__ == "__main__":
     root.title("Simulation d'Ascenseurs")
 
     # Définir le nombre d'ascenseurs et d'étages
-    num_elevators = 3
+    num_elevators = 2
     num_floors = 10
 
     # Créer une instance du contrôleur d'ascenseur
