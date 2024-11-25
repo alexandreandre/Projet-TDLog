@@ -100,7 +100,7 @@ class ElevatorGUI:
                 self.canvas.delete(self.users[user.id])
                 del self.users[user.id]
                 self.controller.users.remove(user)
-        self.root.after(500, self.update_gui)
+        self.root.after(1000, self.update_gui)
 
     def run(self):
         self.root.mainloop()

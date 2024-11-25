@@ -12,6 +12,7 @@ class Elevator:
         :param initial_floor: L'étage initial de l'ascenseur (par défaut 0).
         :param controller: L'objet ElevatorController auquel cet ascenseur appartient (par défaut None).
         """
+        self.pending_destinations = []  # Nouvelle liste pour les destinations en attente
         self.id = elevator_id  # Identifiant unique de l'ascenseur.
         self.current_floor = initial_floor  # Étage actuel de l'ascenseur.
         self.destination_floors = []  # Liste des étages que l'ascenseur doit atteindre.
@@ -21,43 +22,45 @@ class Elevator:
         self.controller = controller  # Ajouter une référence à l'objet ElevatorController
 
     def add_destination(self, floor):
-        """
-        Ajoute une destination à l'ascenseur, si elle n'est pas déjà présente.
-        La liste des destinations est triée pour optimiser le mouvement de l'ascenseur.
-        """
-        if floor not in self.destination_floors:
-            # Si l'ascenseur monte et qu'un appel est fait pour un étage inférieur,
-            # on l'ajoute à la liste des destinations mais ne change pas la direction immédiatement.
-            if self.direction == 1 and floor < self.current_floor:
-                self.destination_floors.append(floor)  # Ajout pour plus tard (on va d'abord atteindre les étages supérieurs)
+        if floor not in self.destination_floors and floor not in self.pending_destinations:
+            if self.direction == 0:
+                # Si l'ascenseur est inactif, il accepte la destination
+                self.destination_floors.append(floor)
+                # Définir la direction
+                if floor > self.current_floor:
+                    self.direction = 1
+                elif floor < self.current_floor:
+                    self.direction = -1
+                else:
+                    self.direction = 0
+                # Trier les destinations
+                self.destination_floors.sort(reverse=self.direction < 0)
             else:
-                self.destination_floors.append(floor)  # Ajout normal
+                # Si l'ascenseur est en mouvement
+                if (self.direction == 1 and floor >= self.current_floor) or \
+                (self.direction == -1 and floor <= self.current_floor):
+                    # La destination est dans la même direction
+                    self.destination_floors.append(floor)
+                    self.destination_floors.sort(reverse=self.direction < 0)
+                else:
+                    # La destination est dans la direction opposée
+                    self.pending_destinations.append(floor)
 
-            # Trier les destinations pour optimiser le mouvement de l'ascenseur
-            self.destination_floors.sort(reverse=self.direction < 0)  # Trier les destinations en fonction de la direction (descendante ou montante)
 
     def move(self):
-        """
-        Effectue le mouvement de l'ascenseur. L'ascenseur se déplace d'un étage à la fois, en fonction de
-        ses destinations et de sa direction. Une fois arrivé à une destination, il dépose les passagers.
-        """
-        # Si des destinations existent
         if self.destination_floors:
-            self.is_moving = True  # L'ascenseur commence à bouger
-            next_floor = self.destination_floors[0]  # L'étage cible à atteindre
+            self.is_moving = True
+            next_floor = self.destination_floors[0]
 
-            # Si l'ascenseur doit monter
             if self.current_floor < next_floor:
-                self.current_floor += 1  # Monte d'un étage
-                self.direction = 1  # Direction vers le haut
-            # Si l'ascenseur doit descendre
+                self.current_floor += 1
+                self.direction = 1
             elif self.current_floor > next_floor:
-                self.current_floor -= 1  # Descend d'un étage
-                self.direction = -1  # Direction vers le bas
+                self.current_floor -= 1
+                self.direction = -1
 
-            # Arrivé à l'étage
             if self.current_floor == next_floor:
-                # Traiter les passagers qui descendent à cet étage
+                # Arrivé à l'étage cible
                 departing_passengers = [
                     p for p in self.passengers
                     if p.destination_floor == self.current_floor
@@ -69,35 +72,57 @@ class Elevator:
                 # Supprimer l'étage atteint de la liste des destinations
                 self.destination_floors.pop(0)
 
-                # Vérifier si d'autres demandes doivent être prises en compte pendant le trajet
+                # Mettre à jour les destinations
                 self.update_destinations()
 
-                # Si l'ascenseur n'a plus de destinations et de passagers, il s'arrête
-                if not self.destination_floors and not self.passengers:
-                    self.is_moving = False  # L'ascenseur arrête son mouvement
-                    self.direction = 0  # Réinitialisation de la direction à 0 (inactif)
+                # Si plus de destinations, vérifier les destinations en attente
+                if not self.destination_floors and self.pending_destinations:
+                    # Déplacer les destinations en attente vers la liste principale
+                    self.destination_floors = self.pending_destinations.copy()
+                    self.pending_destinations.clear()
+                    # Définir la nouvelle direction
+                    if self.destination_floors[0] > self.current_floor:
+                        self.direction = 1
+                    else:
+                        self.direction = -1
+                    # Trier les destinations
+                    self.destination_floors.sort(reverse=self.direction < 0)
+                elif not self.destination_floors:
+                    self.is_moving = False
+                    self.direction = 0
         else:
-            # Si aucune destination n'est définie
-            if not self.passengers:  # Si l'ascenseur n'a plus de passagers
-                self.is_moving = False  # L'ascenseur reste immobile
-                self.direction = 0  # L'ascenseur ne bouge plus
+            if self.pending_destinations:
+                self.destination_floors = self.pending_destinations.copy()
+                self.pending_destinations.clear()
+                if self.destination_floors[0] > self.current_floor:
+                    self.direction = 1
+                else:
+                    self.direction = -1
+                self.destination_floors.sort(reverse=self.direction < 0)
+                self.is_moving = True
+            else:
+                self.is_moving = False
+                self.direction = 0
+
 
     def update_destinations(self):
-        """
-        Met à jour la liste des destinations en fonction des nouveaux utilisateurs appelant l'ascenseur.
-        Cette méthode doit être appelée à chaque arrêt de l'ascenseur pour s'assurer qu'il réévalue ses destinations.
-        """
-        # Ajouter des destinations des utilisateurs qui ne sont pas encore à bord
+        # Ajouter les destinations des passagers dans l'ascenseur
         for user in self.passengers:
             if user.destination_floor not in self.destination_floors:
                 self.add_destination(user.destination_floor)
 
-        # Vérifier si de nouveaux utilisateurs ont appelé l'ascenseur pendant son trajet
+        # Vérifier les nouveaux utilisateurs à l'étage actuel
         for user in self.controller.users:
-            if user.current_floor == self.current_floor and not user.in_elevator:
-                self.add_destination(user.destination_floor)
-                user.in_elevator = True
-                self.passengers.append(user)
+            if user.current_floor == self.current_floor and not user.in_elevator and not user.arrived:
+                # Vérifier si le passager va dans la même direction
+                if (self.direction == 1 and user.destination_floor > self.current_floor) or \
+                (self.direction == -1 and user.destination_floor < self.current_floor) or \
+                self.direction == 0:
+                    user.in_elevator = True
+                    user.elevator_id = self.id
+                    self.passengers.append(user)
+                    self.add_destination(user.destination_floor)
+
 
 
     def __repr__(self):
