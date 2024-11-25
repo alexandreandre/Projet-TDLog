@@ -1,7 +1,7 @@
 # main.py
 
 import tkinter as tk
-from elevator_controller import ElevatorController
+from elevator import ElevatorController
 from elevator_gui import ElevatorGUI
 
 if __name__ == "__main__":
