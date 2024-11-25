@@ -3,12 +3,14 @@ from user import User
 
 
 class Elevator:
-    def __init__(self, elevator_id, initial_floor=0):
+
+    def __init__(self, elevator_id, initial_floor=0, controller=None):
         """
         Initialise un ascenseur avec un identifiant unique et un étage initial.
-
+        
         :param elevator_id: L'identifiant unique de l'ascenseur.
         :param initial_floor: L'étage initial de l'ascenseur (par défaut 0).
+        :param controller: L'objet ElevatorController auquel cet ascenseur appartient (par défaut None).
         """
         self.id = elevator_id  # Identifiant unique de l'ascenseur.
         self.current_floor = initial_floor  # Étage actuel de l'ascenseur.
@@ -16,6 +18,7 @@ class Elevator:
         self.direction = 0  # Direction : -1 pour descendre, 1 pour monter, 0 pour inactif.
         self.is_moving = False  # Statut de l'ascenseur (en mouvement ou non).
         self.passengers = []  # Liste des passagers actuellement dans l'ascenseur.
+        self.controller = controller  # Ajouter une référence à l'objet ElevatorController
 
     def add_destination(self, floor):
         """
@@ -23,7 +26,14 @@ class Elevator:
         La liste des destinations est triée pour optimiser le mouvement de l'ascenseur.
         """
         if floor not in self.destination_floors:
-            self.destination_floors.append(floor)
+            # Si l'ascenseur monte et qu'un appel est fait pour un étage inférieur,
+            # on l'ajoute à la liste des destinations mais ne change pas la direction immédiatement.
+            if self.direction == 1 and floor < self.current_floor:
+                self.destination_floors.append(floor)  # Ajout pour plus tard (on va d'abord atteindre les étages supérieurs)
+            else:
+                self.destination_floors.append(floor)  # Ajout normal
+
+            # Trier les destinations pour optimiser le mouvement de l'ascenseur
             self.destination_floors.sort(reverse=self.direction < 0)  # Trier les destinations en fonction de la direction (descendante ou montante)
 
     def move(self):
@@ -33,7 +43,6 @@ class Elevator:
         """
         # Si des destinations existent
         if self.destination_floors:
-            print(self.destination_floors)
             self.is_moving = True  # L'ascenseur commence à bouger
             next_floor = self.destination_floors[0]  # L'étage cible à atteindre
 
@@ -45,20 +54,23 @@ class Elevator:
             elif self.current_floor > next_floor:
                 self.current_floor -= 1  # Descend d'un étage
                 self.direction = -1  # Direction vers le bas
-            else:
-                # Arrivé à l'étage
-                self.destination_floors.pop()  # Supprimer cet étage de la liste des destinations
-                self.direction = 0 if not self.destination_floors else self.direction  # Arrêt de la direction si aucune destination restante
 
-                # Gérer les passagers qui descendent à cet étage
+            # Arrivé à l'étage
+            if self.current_floor == next_floor:
+                # Traiter les passagers qui descendent à cet étage
                 departing_passengers = [
-                    p  # Passagers à cet étage (en fonction de leur destination)
-                    for p in self.passengers
-                    if p.destination_floor == self.current_floor  # Si l'étage actuel est leur destination
+                    p for p in self.passengers
+                    if p.destination_floor == self.current_floor
                 ]
                 for passenger in departing_passengers:
-                    self.passengers.remove(passenger)  # Retirer le passager de la liste des passagers
-                    passenger.arrived = True  # Marquer le passager comme arrivé
+                    self.passengers.remove(passenger)
+                    passenger.arrived = True
+
+                # Supprimer l'étage atteint de la liste des destinations
+                self.destination_floors.pop(0)
+
+                # Vérifier si d'autres demandes doivent être prises en compte pendant le trajet
+                self.update_destinations()
 
                 # Si l'ascenseur n'a plus de destinations et de passagers, il s'arrête
                 if not self.destination_floors and not self.passengers:
@@ -69,6 +81,24 @@ class Elevator:
             if not self.passengers:  # Si l'ascenseur n'a plus de passagers
                 self.is_moving = False  # L'ascenseur reste immobile
                 self.direction = 0  # L'ascenseur ne bouge plus
+
+    def update_destinations(self):
+        """
+        Met à jour la liste des destinations en fonction des nouveaux utilisateurs appelant l'ascenseur.
+        Cette méthode doit être appelée à chaque arrêt de l'ascenseur pour s'assurer qu'il réévalue ses destinations.
+        """
+        # Ajouter des destinations des utilisateurs qui ne sont pas encore à bord
+        for user in self.passengers:
+            if user.destination_floor not in self.destination_floors:
+                self.add_destination(user.destination_floor)
+
+        # Vérifier si de nouveaux utilisateurs ont appelé l'ascenseur pendant son trajet
+        for user in self.controller.users:
+            if user.current_floor == self.current_floor and not user.in_elevator:
+                self.add_destination(user.destination_floor)
+                user.in_elevator = True
+                self.passengers.append(user)
+
 
     def __repr__(self):
         """
@@ -82,10 +112,11 @@ class ElevatorController:
         """
         Initialise le contrôleur avec un nombre d'ascenseurs et un nombre d'étages.
         """
-        self.elevators = [Elevator(elevator_id=i) for i in range(num_elevators)]  # Crée plusieurs ascenseurs
+        self.elevators = [Elevator(elevator_id=i, controller=self) for i in range(num_elevators)]  # Passer 'self' comme controller à chaque ascenseur
         self.num_floors = num_floors  # Nombre d'étages dans l'immeuble
         self.users = []  # Liste des utilisateurs (passagers)
         self.user_id_counter = 0  # Compteur d'ID pour les utilisateurs
+
 
     def request_elevator(self, user):
         """
