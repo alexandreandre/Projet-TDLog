@@ -13,10 +13,9 @@ class Elevator:
         self.id = elevator_id  # Identifiant unique de l'ascenseur.
         self.current_floor = initial_floor  # Étage actuel de l'ascenseur.
         self.destination_floors = []  # Liste des étages que l'ascenseur doit atteindre.
-        self.direction = (
-            0  # Direction : -1 pour descendre, 1 pour monter, 0 pour inactif.
-        )
+        self.direction = 0  # Direction : -1 pour descendre, 1 pour monter, 0 pour inactif.
         self.is_moving = False  # Statut de l'ascenseur (en mouvement ou non).
+        self.passengers = []  # Liste des passagers actuellement dans l'ascenseur.
 
     def add_destination(self, floor):
         if floor not in self.destination_floors:
